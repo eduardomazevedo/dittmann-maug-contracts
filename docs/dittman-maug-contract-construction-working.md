@@ -27,19 +27,75 @@ $$W_T = (\phi + W_0) \cdot e^{rf \cdot T} + n_s \cdot P_T + n_o \cdot \max(P_T -
 
 ## Part 2: Data Sources - Where Everything Comes From
 
-### The Three Data Tables
+### Exact Source Tables Used in `Dataset Construction Macro V4.sas`
 
-All data comes from **ExecuComp** (ExecuComp is a database of executive compensation):
+The SAS code reads **four** ExecuComp source tables from `libname dir`:
+- `dir.comptabl` and `dir.coperol` merged in `work.a1` by `co_per_rol` (line 37)
+- `dir.codirfin` loaded in `work.a11` (line 188) and merged by `permid year`
+- `dir.stgrttab` merged into option-grant data in `work.a14` by `co_per_rol year` (line 232)
 
-| Table | Contains | Used For |
-|-------|----------|----------|
-| **AnnComp** | Annual compensation (salary, bonus, stock grants, option grants) | Salary, bonus, LTI payouts, RSU values |
-| **CoDirFin** | Director/company financials (stock price, dividend yield, volatility) | $P_0$, $d$, $\sigma$ |
-| **StGrtTab** | Stock grant details (option grants with strike prices, maturity) | Option details for aggregation |
+Below, "Used for" refers to the variables in the contract-construction pipeline.
 
-### Time Periods: Very Important!
+#### Table: `dir.comptabl`
 
-**Key Concept:** We construct data for a **measurement year** (e.g., 2000) based on data from the **measurement year AND prior years**.
+| Variable | Description | Used For |
+|---|---|---|
+| `salary` | Base salary (yearly cash pay) | `phi`, `W0`, salary filter |
+| `bonus` | Annual bonus | `phi`, `W0` |
+| `othann` | Other annual compensation | `phi`, `W0` |
+| `ltip` | Long-term incentive payout | `W0` (not in `phi`) |
+| `allothtot` | All other total compensation | `phi`, `W0` |
+| `shrown` | Shares owned at fiscal year-end | `n_s`, `W0` share-trade adjustment |
+| `pinclopt` | Flag: shares and exercisable options not separated | Exclusion filter |
+| `rstkgrnt` | Restricted stock grants (value) | `W0` update |
+| `soptexer` | Value realized from option exercises | `W0` update |
+| `rstkhld` | Restricted shares held (count) | `W0` tax adjustment; `nSr` |
+| `uexnumun` | Unexercisable options held (count) | Option book-keeping (`n_o`) |
+| `uexnumex` | Exercisable options held (count) | Option book-keeping (`n_o`) |
+| `inmonun` | In-the-money value of unexercisable options | Core-Guay approximation |
+| `inmonex` | In-the-money value of exercisable options | Core-Guay approximation |
+| `soptexsh` | Number of options exercised during year | Stored in adjusted form (`soptexsh_a`) |
+
+#### Table: `dir.coperol`
+
+| Variable | Description | Used For |
+|---|---|---|
+| `co_per_rol` | ExecuComp person-firm-year key | Join key (`comptabl`, `stgrttab`) |
+| `execid` | Executive identifier | CEO history, continuity, output key |
+| `permid` | Company identifier | Merge to firm financials, company-switch logic |
+| `year` | ExecuComp fiscal-year index | Time filtering (`year`, `year+1`) |
+| `ceoann` | CEO flag | Keep CEOs in measurement year |
+
+#### Table: `dir.codirfin`
+
+| Variable | Description | Used For |
+|---|---|---|
+| `permid` | Company identifier | Merge key with executive-year panel |
+| `year` | Fiscal year | Merge key and year alignment |
+| `prccf` | Fiscal-year-end stock price | `P0`, Black-Scholes inputs |
+| `ajex` | Split adjustment factor | Adjust shares/options/strikes/prices |
+| `divyield` | Dividend yield (%) | `d`, dividends in `W0` flow |
+| `fyr` | Fiscal year-end month | Option maturity from grant date to FY-end |
+| `shrsout` | Shares outstanding (thousands) | Normalize `n_s`, `n_o`; compute `P0` |
+| `bs_volatility` | Volatility input | `sigma`, option valuation |
+
+#### Table: `dir.stgrttab`
+
+| Variable | Description | Used For |
+|---|---|---|
+| `co_per_rol` | Person-firm-year key | Join to executive-year panel |
+| `year` | Fiscal year | Join to executive-year panel |
+| `numsecur` | Granted option count | Option grant size for aggregation |
+| `expric` | Grant exercise price | Option strike inputs |
+| `exdate` | Grant expiration date | Option maturity inputs |
+
+### Notation Convention Used Below
+
+To be explicit, variable references use `table$variable` style (R notation), e.g., `codirfin$prccf`, `comptabl$salary`, `stgrttab$expric`.
+
+### Time Periods:
+
+We construct data for a **measurement year** (e.g., 2000) based on data from the **measurement year AND prior years**.
 
 Example for year **2000**:
 - **Measurement Year:** 2000 (the year we're analyzing)
@@ -56,34 +112,32 @@ Example for year **2000**:
 
 ## Part 3: The Six Key Variables
 
+**Year-index rule used by SAS macro `%construct(year, history)`:**
+- `reference year = year` (e.g., 1999 when building 2000 contracts)
+- `measurement year = year + 1` (e.g., 2000)
+
 ### Variable 1: $\phi$ (Base Salary + Bonus + Some Other Compensation)
 
 **What it represents:** Guaranteed, fixed compensation
 
 **Formula from SAS code (line 564-566):**
 ```
-phi = salary + bonus + othann + allothtot
+phi = comptabl$salary + comptabl$bonus + comptabl$othann + comptabl$allothtot
+(evaluated at measurement year = year + 1)
 ```
 
 **ExecuComp variables:**
-- `salary` - Base salary
-- `bonus` - Annual bonus (cash)
-- `othann` - Other annual compensation (perks, etc.)
-- `allothtot` - All other total (miscellaneous)
+- `comptabl$salary` - Base salary
+- `comptabl$bonus` - Annual bonus (cash)
+- `comptabl$othann` - Other annual compensation (perks, etc.)
+- `comptabl$allothtot` - All other total (miscellaneous)
+
+**Year used:** **measurement year** (`year+1`) from `a1`/`a19`.
 
 **IMPORTANT - What's NOT included:**
 - **NOT `ltip`** (Long-Term Incentive Plan payouts) - This is treated separately in $W_0$ calculation
 - **NOT value of option grants** - Options are handled separately
 - **NOT value of stock grants** - Grants are handled separately
-
-**Why this matters:** We want to separate the **guaranteed** part of pay ($\phi$) from the **at-risk** parts (shares, options). The firm can guarantee $\phi$ no matter what the stock does.
-
-**Verification Check:**
-```
-✓ Is salary + bonus the main component?
-✓ Are option grants excluded?
-✓ Are stock grants excluded?
-```
 
 ---
 
@@ -96,8 +150,8 @@ phi = salary + bonus + othann + allothtot
 P0 = price_fiscal_yearend * shares_outstanding
 
 Where:
-  price = prccf / ajex  (adjust for stock splits)
-  shares = shrsout * 1000 * ajex  (convert to individual shares, adjust for splits)
+  price = codirfin$prccf / codirfin$ajex  (adjust for stock splits)
+  shares = codirfin$shrsout * 1000 * codirfin$ajex  (convert to individual shares, adjust for splits)
 ```
 
 **In plain English:**
@@ -110,12 +164,7 @@ Where:
 - Shares outstanding: 100 million
 - Stock split adjusted: $50 × 100M = $5 billion firm value
 
-**Verification Check:**
-```
-✓ Is this from fiscal year-end (1999 for measurement year 2000)?
-✓ Are stock splits accounted for?
-✓ Is it total firm value, not per-share?
-```
+**Year used:** **reference year** (`year`) from merged `a12/a16` (originally `codirfin` at `year`).
 
 ---
 
@@ -125,7 +174,7 @@ Where:
 
 **Formula (SAS line 547):**
 ```
-d = divyield / 100
+d = codirfin$divyield / 100
 ```
 
 **Simple:** ExecuComp provides `divyield` as a percentage (e.g., 2.5), we convert to decimal (0.025)
@@ -133,18 +182,12 @@ d = divyield / 100
 **Why it matters:**
 - Used in Black-Scholes option pricing
 - If CEO owns shares, dividends are part of their returns
-- Higher dividends = lower option value (less upside potential)
 
 **Example:**
 - ExecuComp reports: `divyield = 2.5` (2.5%)
 - We calculate: `d = 0.025`
 
-**Verification Check:**
-```
-✓ Is dividend yield from ExecuComp divyield field?
-✓ Is it converted to decimal form (divide by 100)?
-✓ Is it around 0-5% typically?
-```
+**Year used:** **reference year** (`year`) from `codirfin$divyield`.
 
 ---
 
@@ -154,10 +197,13 @@ d = divyield / 100
 
 **Formula (SAS lines 177, 546):**
 ```
-sigma = bs_volatility
+sigma = codirfin$bs_volatility
 ```
 
-**Simple:** ExecuComp already provides this; we just use it directly
+**Year used:** **reference year** (`year`), not measurement year.  
+For `%construct(1999,5)`, `sigma` is `codirfin$bs_volatility` from fiscal-year **1999**.
+
+**Simple:** ExecuComp already provides this; we use the reference-year value directly.
 
 **Important detail:** ExecuComp calculates `bs_volatility` using:
 - 60 months of prior stock returns
@@ -173,13 +219,6 @@ sigma = bs_volatility
 - ExecuComp reports: `bs_volatility = 0.45` (45% annualized volatility)
 - We use: `sigma = 0.45`
 
-**Verification Check:**
-```
-✓ Is this from ExecuComp bs_volatility field?
-✓ Is it typically 0.20 - 0.80 (20-80%)?
-✓ Is it already in decimal form (not percentage)?
-```
-
 ---
 
 ### Variable 5: $rf$ (Risk-Free Rate)
@@ -191,6 +230,8 @@ sigma = bs_volatility
 For year 2000 (measurement year), use 6-year Treasury yield from January 2000
 rf = 0.0664  (6.64%)
 ```
+
+**Year used:** **measurement year** (`year+1`) via `select (year_num+1)` in `work.a18`.
 
 **Why 6-year?** The average option maturity is ~6 years, so use 6-year Treasury rate
 
@@ -223,14 +264,16 @@ rf = 0.0664  (6.64%)
 ns = shrown_adjusted / shrsout_adjusted
 
 Where:
-  shrown_adjusted = shrown * ajex  (CEO shares, adjusted for stock splits)
-  shrsout_adjusted = shrsout * 1000 * ajex  (all shares, adjusted for stock splits)
+  shrown_adjusted = comptabl$shrown * codirfin$ajex  (CEO shares, adjusted for stock splits)
+  shrsout_adjusted = codirfin$shrsout * 1000 * codirfin$ajex  (all shares, adjusted for stock splits)
 ```
 
 **In plain English:**
 ```
 ns = (number of shares CEO owns) / (total number of shares in company)
 ```
+
+**Year used:** **reference year** (`year`) holdings and shares-outstanding snapshot.
 
 **Example:**
 - CEO owns: 1 million shares
@@ -469,6 +512,30 @@ What this does:
 | 553-559 | Set risk-free rate |
 | 564-566 | Final output |
 
+### Procedure Map in Precise `table$variable` Notation
+
+1. Build executive-year base panel:
+`a1 <- merge(comptabl, coperol, by = "co_per_rol")`
+
+2. Keep target CEOs and history:
+Use `coperol$ceoann`, `coperol$year`, `coperol$execid`, `comptabl$salary`, `comptabl$pinclopt`, `comptabl$shrown`.
+
+3. Add firm financial data and split adjustments:
+`a12$shrown_a <- comptabl$shrown * codirfin$ajex`, `a12$prccf_a <- codirfin$prccf / codirfin$ajex`, `a12$shrsout_a <- codirfin$shrsout * codirfin$ajex`, `a12$dps_a <- codirfin$divyield/100 * codirfin$prccf/codirfin$ajex`.
+
+4. Build option-grant panel:
+`a14 <- merge(stgrttab, a13, by = c("co_per_rol","year"))` using `stgrttab$numsecur`, `stgrttab$expric`, `stgrttab$exdate`, `codirfin$ajex`.
+
+5. Compute wealth and representative option in IML:
+Wealth uses `comptabl$salary`, `comptabl$bonus`, `comptabl$othann`, `comptabl$ltip`, `comptabl$allothtot`, `comptabl$soptexer`, `comptabl$rstkgrnt`, `comptabl$rstkhld`, `comptabl$shrown`, `codirfin$prccf`, `codirfin$divyield`.
+Option approximation uses `comptabl$uexnumun`, `comptabl$uexnumex`, `comptabl$inmonun`, `comptabl$inmonex`, `stgrttab$numsecur`, `stgrttab$expric`, `stgrttab$exdate`, `codirfin$bs_volatility`, `codirfin$fyr`.
+
+6. Normalize to contract parameters:
+`n_s <- shares_held / (codirfin$shrsout * 1000 * codirfin$ajex)`, `n_o <- options_held / (codirfin$shrsout * 1000 * codirfin$ajex)`, `P0 <- (codirfin$prccf/codirfin$ajex) * (codirfin$shrsout*1000*codirfin$ajex)`, `d <- codirfin$divyield/100`, `sigma <- codirfin$bs_volatility`.
+
+7. Add final-period fixed pay:
+`phi <- comptabl$salary + comptabl$bonus + comptabl$othann + comptabl$allothtot` at `year + 1`.
+
 ---
 
 ## Part 7: Manual Verification Walkthrough
@@ -487,48 +554,49 @@ Let's say we pick a CEO: `GVKEY=1000, EXECID=123` and manually verify:
 
 #### Step 2: Calculate phi (Base Compensation)
 ```
-From ExecuComp AnnComp table for year 2000:
-  salary = $500K
-  bonus = $150K
-  othann = $50K
-  allothtot = $100K
+From the year-2000 row in the merged compensation panel (`a1`, originally `comptabl`/`coperol`):
+  a1$salary = $500K
+  a1$bonus = $150K
+  a1$othann = $50K
+  a1$allothtot = $100K
   
-phi = 500 + 150 + 50 + 100 = $800K
+phi = a1$salary + a1$bonus + a1$othann + a1$allothtot = $800K
 ```
 
 #### Step 3: Calculate P0 (Firm Value)
 ```
-From ExecuComp CoDirFin table for fiscal year 1999:
-  prccf = $50  (stock price 12/31/1999)
-  ajex = 1.0  (no stock splits)
-  shrsout = 100  (shares in millions)
+From fiscal-year-1999 `codirfin`:
+  codirfin$prccf = $50
+  codirfin$ajex = 1.0
+  codirfin$shrsout = 100  (thousands)
   
-price_adjusted = 50 / 1.0 = $50
-shares_adjusted = 100 × 1000 × 1.0 = 100 million shares
+price_adjusted = codirfin$prccf / codirfin$ajex = $50
+shares_adjusted = codirfin$shrsout × 1000 × codirfin$ajex = 100 million shares
 
 P0 = 50 × 100M = $5,000M = $5 billion
 ```
 
 #### Step 4: Calculate ns (Ownership Fraction)
 ```
-From ExecuComp AnnComp table for year 1999:
-  shrown = 0.5  (CEO owns 500K shares)
-  ajex = 1.0
+From year-1999 `comptabl` + `codirfin`:
+  comptabl$shrown = 0.5  (thousands)
+  codirfin$ajex = 1.0
+  codirfin$shrsout = 100  (thousands)
   
-shrown_adjusted = 0.5 × 1.0 = 0.5M shares
-shrsout_adjusted = 100M shares
+shrown_adjusted = comptabl$shrown × codirfin$ajex = 0.5M shares
+shrsout_adjusted = codirfin$shrsout × 1000 × codirfin$ajex = 100M shares
 
 ns = 0.5M / 100M = 0.005 (0.5% ownership)
 ```
 
 #### Step 5: Get d, sigma, rf (Simple Direct Values)
 ```
-From ExecuComp CoDirFin for fiscal 1999:
-  divyield = 2.5
-  bs_volatility = 0.35
+From fiscal-1999 `codirfin`:
+  codirfin$divyield = 2.5
+  codirfin$bs_volatility = 0.35
 
-d = 2.5 / 100 = 0.025
-sigma = 0.35  (as-is)
+d = codirfin$divyield / 100 = 0.025
+sigma = codirfin$bs_volatility = 0.35
 
 From hardcoded SAS table for year 2000:
   rf = 0.0664
@@ -539,14 +607,15 @@ From hardcoded SAS table for year 2000:
 This requires data from 1995-1999, tracking wealth accumulation
 
 Year 1995 (first year):
-  Cash income: (salary + bonus + othann + ltip + allothtot + exercises) = $1.2M
+  Cash income:
+  comptabl$salary + comptabl$bonus + comptabl$othann + comptabl$ltip + comptabl$allothtot + comptabl$soptexer = $1.2M
   After-tax (0.42): $1.2M × 0.58 = $696K
   W0_1995 = $696K
 
 Year 1996:
   Prior W0 grows: $696K × 1.05 = $730.8K
   New after-tax income: $800K × 0.58 = $464K
-  Adjustments (RSUs, shares): +$200K
+  Adjustments (restricted stock and share trading): uses `comptabl$rstkgrnt`, `comptabl$rstkhld`, `comptabl$shrown`, `codirfin$prccf`, `codirfin$divyield`
   W0_1996 = $730.8 + $464 + $200 = $1,394.8K
 
 Year 1997: ... (repeat process)
@@ -559,8 +628,8 @@ Final W0 = cumulative wealth as of end of 1999
 #### Step 7: Calculate no, K, T (Option Aggregation)
 ```
 Collect all option holdings:
-  From prior grants: 50K unexercisable options, 100K exercisable options
-  From current grant (2000): 25K options
+  From holdings in `comptabl`: `comptabl$uexnumun`, `comptabl$uexnumex`
+  From grants in `stgrttab`: `stgrttab$numsecur`, `stgrttab$expric`, `stgrttab$exdate`
   Total: 175K options as of fiscal 1999
   
 Maturity adjustment: T_adjusted = T_original × 0.7
