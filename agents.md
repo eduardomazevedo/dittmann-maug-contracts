@@ -28,9 +28,12 @@ This file will document the roles and responsibilities of various agents involve
 
 *   `docs/prd.md`: Project Requirement Document (draft). Outlines the high-level goals and approach for replicating the Dittman and Maug (2007) paper.
 *   `agents.md`: Defines roles and responsibilities for human and AI agents, project conventions, and available documentation.
-*   `docs/references/dittman-maug-2007.md`: Markdown version of the core research paper.
+*   `docs/dittman-maug-key-excerpts.md`: Key excerpts from the original paper that explain data construction.
+*   `docs/references/dittman-maug-2007.md`: Markdown dump of the original Dittman and Maug (2007) research paper with detailed information.
+*   `docs/references/dittman-maug-zhang-2011.md`: Markdown dump of the Dittman, Maug, and Zhang (2011) research paper with additional details.
+*   `docs/dittman-maug-code/Dataset Construction Macro V4.sas`: Original SAS code from the authors; this is the key file in their codebase for constructing contracts from the data.
+*   `docs/dittman-maug-contract-construction-procedure.md`: Joint human-and-AI document and a very important reference detailing how optimal contracts are calculated.
 *   `docs/execucomp-docs/Execucomp_Data_Definitions.md`: Detailed definitions of ExecuComp data items.
 *   `docs/execucomp-docs/Execucomp_changes_2006_FAS_123_.md`: Information on changes in ExecuComp reporting due to FAS 123(R).
-*   `docs/dittman-maug-contract-construction-procedure.md`: AI-generated detailed explanation of the Dittman and Maug (2007) CEO compensation contract construction procedure, including variable usage and data sources.
-*   `DROPBOX/dittman-maug-replication-materials/SAS/1 dataset construction/Dataset Construction Macro V4.sas`: The original SAS script used by Dittman and Maug (2007) for dataset construction.
+*   `docs/dittman-maug-contract-construction-working.md`: Working document for iterative contract-construction notes and refinements.
 
