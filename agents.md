@@ -20,7 +20,7 @@ This file will document the roles and responsibilities of various agents involve
     *   Flag all AI-generated commit messages with "(model)" at the end.
     *   **Code Location:** Python files are located in `src/py/`.
     *   **Script Execution:** All scripts are run from the project root directory.
-    *   **Data Storage:** The `./DROPBOX/` directory is gitignored and used for storing data, PDFs, and other non-versioned assets.
+    *   **Data Storage:** Data is stored on dropbox. The script `src/bash/download_raw_data.sh` downloads the data using rclone. User has to set up rclone once to do this with .env file, or has to copy data manually.
     *   Utilize `uv` for Python package management.
     *   Strive for replication accuracy and code quality.
 

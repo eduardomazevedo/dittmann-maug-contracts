@@ -11,3 +11,6 @@ wheels/
 
 # Dropbox
 DROPBOX/
+
+# Env and rclone secrets (use .env.example as template)
+.env

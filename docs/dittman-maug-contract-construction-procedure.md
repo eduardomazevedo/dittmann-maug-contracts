@@ -39,6 +39,9 @@ Where:
 
 ## 3. Key Variable Definitions and Construction
 
+Their SAS code `Dataset Construction Macro V4.sas` uses the following tables and variables:
+TODO: list tables and variables here.
+
 The following variables are constructed for each CEO for a specific `considered year` (e.g., 2000).
 
 ### 3.1. `P0` (Market Value of the Firm)

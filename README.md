@@ -1,0 +1,1 @@
+Run uv sync. Then download execucomp tables to data/raw/. can be done manually or with rclone if you config rclone and create .env file. see .env.example for instructions.
