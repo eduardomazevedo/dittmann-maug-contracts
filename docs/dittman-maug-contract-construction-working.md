@@ -1,49 +1,27 @@
-# Data Construction Explained: A Manual Guide for Verification
+# DM Data Construction Process
 
-**Purpose:** This document breaks down the critical parts of the Dittman & Maug (2007) data construction methodology in plain language so you can manually verify our Python implementation matches the original logic.
-
-**Related Files:**
-- `docs/dittman-maug-code/Dataset Construction Macro V4.sas` - Original SAS code
-- `docs/references/dittman-maug-2007.md` - Original DM paper in markdown.
+**Purpose:** This document breaks down the critical parts of the Dittman & Maug (2007) data construction methodology in plain language.
 
 ---
 
 ## Part 1: DM's parametrization of contracts
 
-### What We're Trying to Do
-
-The researchers want to model CEO wealth as a **function of firm performance**:
-
-$$W_T = f(P_T; \text{contract parameters})$$
-
-Where:
-- **$W_T$** = CEO's end-of-period wealth (what they're worth at the end of the year)
-- **$P_T$** = Stock price at end of period
-- **Contract parameters** = Things the firm can control (salary, shares, options)
-
-### The Wealth Formula
+DM speficy how CEO wealth W_T depends on final stock price P_T and contract parameters:
 
 $$W_T = (\phi + W_0) \cdot e^{rf \cdot T} + n_s \cdot P_T + n_o \cdot \max(P_T - K, 0)$$
 
-**Plain English Breakdown:**
+**Definitions:**
 
-1. **$(\phi + W_0) \cdot e^{rf \cdot T}$** - "Safe money that grows"
-   - $\phi$ = Salary + Bonus for the year (guaranteed, risk-free)
-   - $W_0$ = CEO's outside wealth (savings, other investments)
+
+   - $\phi$ = Salary + Bonus for the year
+   - $W_0$ = CEO's outside wealth
    - $e^{rf \cdot T}$ = Growth factor at risk-free rate over time $T$
-   - **This part doesn't depend on stock price** - it's guaranteed
 
-2. **$n_s \cdot P_T$** - "Money from shares they own"
    - $n_s$ = Fraction of total shares the CEO owns (e.g., 0.005 = 0.5%)
    - $P_T$ = Stock price at end of year
-   - If stock goes up, this goes up; if it goes down, this goes down
-   - **This part is at-risk**
 
-3. **$n_o \cdot \max(P_T - K, 0)$** - "Money from stock options"
    - $n_o$ = Number of options the CEO holds (as fraction of total shares)
-   - $\max(P_T - K, 0)$ = Option payoff (only profit if stock > strike price)
    - $K$ = Strike price (exercise price)
-   - **This part is also at-risk and nonlinear** (doesn't make money until stock exceeds $K$)
 
 ---
 
