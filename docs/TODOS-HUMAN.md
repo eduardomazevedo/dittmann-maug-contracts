@@ -1,16 +1,8 @@
 # Dhiraj
 
-- download the Core and Guay paper, to understand it and add to dropbox references and to our docs. Core, John and Wayne Guay, 2002, Estimating the value of employee stock option portfolios and their sensitivities to price and volatility, Journal of Accounting Research 40, 613-630
-- probably good idea for you to manually see the important parts of the data construction docs so that claude is not mega confused.
-- Goal for next meeting:
-    - Have good working version. With good docs, so that we both really understand what is going on.
-    - The main contract construction w(P) should be implemented. We should be able to take a ceo year, and see the contract params, and draw w(p) function.
-    - Do some barebones html viz so that we can choose the ceo year and see the result, because that is a way for us to interactively test it together. i think some libraries that do this nice html viz are like streamlit and shiny. When you do that, it would be nice to see also what is the raw data from execucomp that was used to come up with the contract. good for our manual debugging.
-    - if possible, look for stuff in the dittman and maug paper that they report. And if so create a test that asserts that what we are doing matches the number they report.
+1. clean description of their method. read SAS read paper. make sure it is correct. make sure it is fully specified (eg is variable coming from reference year or measurement year?).
 
-
-# Notes
-
-- the file Dataset Construction Macro V4.sas seems to be the main script that they used to construct the data. So seems like the main script to flag to claude to translate to python.
-- the format of compustat changed I think in 2006. I imagine these guys have been mostly using the old format, but who knows. So you will have to really understand compustat and what they did to make sure it is correct and works for all years, old and new.
-- one thing we will do different, is that DM first find all of the options held by CEO, then aggregate into single representative option. But we dont care. We are fine with having a whole bunch. So first we reproduce their data, because we always want to reproduce first and be able to test versus their results, but in our actual paper we will basically always use all of the options.
+2. Functions to write.
+a. We always have main() that runs all analyses and produces all output. Reproducible research.
+b. Need function get_contract_parameters(data). I am not sure whether this function should be for one executive year or for doing it for the whole dataset. Prob for one executive year makes more sense. I am not sure whether inputs should be the pandas dataframes that are needed (often only one row of each because of the reference year stuff). Or whether it is better to pass entire dataset along with desired year / CEO.
+c. We should then use our function to try to reproduce their table 1. Produce some output in output/ with a comparison of table 1 and what we reproduced. If it works, make this an automated pytest. Eventually you will commit a csv with their table. And you can commit a yaml file of stats that they report in the paper, and that we try to match.
